@@ -1,0 +1,127 @@
+---
+title: "Regression"
+author: "Mehdi Ghane"
+date: "October 31, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(java.parameters = "-Xmx6g")
+library(XLConnect)
+library(rJava)
+library(xlsx)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(lattice)
+library(scales)
+library(plotly)
+library(htmlwidgets)
+library(data.table)
+library(stats)
+library(mosaic)
+library(tidyselect)
+library(plotly)
+setwd("C:/Users/Mehdi/Desktop/Desktop/Data Science/Projects/reCLAIM/regression_comp_starter_kit")
+train <- fread("./Header - train.csv", na.strings = c("Unspecified","Not Available"))
+vvalidation <- fread("./Viking - Validation.csv", na.strings = c("Unspecified","Not Available"))
+vtrain <- fread("./Viking - Train.csv", na.strings = c("Unspecified","Not Available"))
+test <- fread("./Header - test.csv", na.strings = c("Unspecified","Not Available"))
+tall <- tally(group_by(train,Province, Formation, Pool, Field), sort = TRUE, na.rm=T)
+nr <- contains("Viking", ignore.case = TRUE, vars = train$Formation)
+nr <- c(nr,contains("Viking Formation", ignore.case = TRUE, vars = train$Formation))
+ftrain <- train[nr,]
+mviking <- rbind(vtrain,vvalidation)
+count(isTRUE(duplicated(mviking$EPAssetsId)))
+df <- merge(ftrain, mviking, by="EPAssetsId", all = TRUE)
+df <- mutate(df, Hlength = TotalDepth - TVD)
+df <- mutate(df, Hlength2 = sqrt((Surf_Longitude-BH_Longitude)^2+(Surf_Latitude-BH_Latitude)^2))
+nrn <- count(is.na(df$Hlength))
+nrn2 <- count(is.na(df$Hlength2))
+count(df$Hlength<0)
+min(df$Hlength,na.rm = TRUE)
+head <- colnames(df)
+head[87] <- "MaxOil_BOE"
+head[88] <- "Frac_Stages"
+head[89] <- "OpenHole"
+head[90] <- "Comp_Events"
+head[92] <- "Norm_BOE"
+head[93] <- "Norm_Oil"
+head[94] <- "Norm_Gas"
+head[95] <- "Norm_Water"
+colnames(df) <- head
+##nr <- c(nr,contains("Viking Formation", ignore.case = TRUE, vars = train$Formation))
+##ftrain <- train[nr,]
+#                merged <- rbind(train,validation)
+#                wcmerged <- rbind(wctrain,wcvalidation)
+#                count(isTRUE(duplicated(merged$EPAssetsId)))
+ #               count(isTRUE(duplicated(wcmerged$EPAssetsId)))
+##df <- merge(ftrain, mviking, by="EPAssetsId", all = TRUE)
+#                df <- mutate(merged, Hlength = TotalDepth - TVD)
+#                df <- mutate(df, Hlength2 = sqrt((Surf_Longitude-BH_Longitude)^2+(Surf_Latitude-BH_Latitude)^2))
+#                nrn <- count(is.na(df$Hlength))
+#                nrn2 <- count(is.na(df$Hlength2))
+#                count(df$Hlength<0)
+#                min(df$Hlength,na.rm = TRUE)
+ #               df$Hlength[which(df$Hlength<0)] <-   NA
+  #              favstats(df$Hlength)
+ #               quantile(df$Hlength, c(0,0.01,0.05,0.1,0.25,0.5,0.75,1), na.rm = T)
+ #               df <- merge(df, wcmerged, by="EPAssetsId", all = TRUE)
+  #              head <- colnames(df)
+ ##               head[87] <- "MaxOil_BOE"
+ #               head[88] <- "Frac_Stages"
+  #              head[89] <- "OpenHole"
+  #              head[90] <- "Comp_Events"
+  #              colnames(df) <- head
+# working with data
+df$LicenceDate <- as.Date(df$LicenceDate, format = "%m/%d/%Y") ; df$SpudDate <- as.Date(df$SpudDate, format = "%m/%d/%Y"); df$RigReleaseDate <- as.Date(df$RigReleaseDate, format = "%m/%d/%Y"); df$StatusDate <- as.Date(df$StatusDate, format = "%m/%d/%Y")
+df$TimeDiff_Now_Status <- as.numeric(Sys.Date() - df$StatusDate)
+df$TimeDiff_Status_RigRelease <- as.numeric(df$StatusDate - df$RigReleaseDate)
+df$TimeDiff_Nows_RigRelease <- as.numeric(Sys.Date() - df$RigReleaseDate)
+df$TimeDiff_RigRelease_Spud <- as.numeric(df$RigReleaseDate-df$SpudDate)
+# Group_by the data to calculate median for well status
+df <- df %>% group_by(WellTypeStandardised) %>% mutate(Md_time_diff=median(TimeDiff_Now_Status, na.rm = TRUE)) %>% arrange(Md_time_diff)
+df <- df%>% mutate(Oper_Licens = ifelse(CurrentOperator==Licensee,1,0))
+df <- df%>% mutate(ParOper_ParLicens = ifelse(CurrentOperatorParent==LicenseeParentCompany,1,0))
+dfrn <- df[which(!is.na(df$Norm_Oil)),]
+dff <- df[which(df$DaysDrilling<40 & df$TimeDiff_RigRelease_Spud>0),]
+#        count(df$Comp_Events>0 & df$well_status=="Suspended")
+#        count(df$Comp_Events>0 & df$well_status=="Active")
+ #       count(df$Comp_Events>0 & df$well_status=="Abandoned")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(dfrn$DaysDrilling,dfrn$TimeDiff_RigRelease_Spud)
+qplot(WellProfile,Norm_Oil, data = dfrn, geom = "boxplot")
+qplot(WellProfile,MaxOil_BOE, data = dfrn, geom = "boxplot")
+qplot(WellProfile,Hlength, data = dfrn, geom = "boxplot")
+#############
+
+
+qplot(WellProfile,TimeDiff_RigRelease_Spud, data = dfrn, geom = "boxplot", ylim = c(0,50))
+qplot(WellProfile,DaysDrilling, data = dfrn, geom = "boxplot", ylim = c(0,50))
+qplot(WellProfile,TimeDiff_Status_RigRelease, data = dfrn, geom = "boxplot", ylim = c(0,50))
+qplot(WellProfile,DrillMetresPerDay, data = dfrn, geom = "boxplot")
+#########
+plot(dfrn$Norm_Oil,dfrn$DrillMetresPerDay)
+
+########
+qplot(Norm_Oil, data = dfrn, bins=100, fill=WellProfile, facets =WellProfile~.) ## no filter
+
+########
+ggplot(data = dfrn, aes(y = Norm_Oil, x = Hlength)) + geom_point(aes(color=WellProfile),size = 2,alpha=1/2, position = "jitter") +xlim(c(1,2000))+ylim(c(1,100)) + ylab("Norm Oil") +xlab("Horizontal Length") + ggtitle("Scatterplot")
+
+
+ggplot(data = dfrn, aes(y = Norm_Oil, x = MaxOil_BOE)) + geom_point(aes(color=ParOper_ParLicens),size = 2, position = "jitter") +xlim(c(1,300))+ylim(c(1,100)) + ylab("Norm Oil") +xlab("MaxOil") + ggtitle("Scatterplot")
+######
+ggplot(data=dfrn, aes(x=Oper_Licens,  fill=WellProfile)) +
+geom_bar(stat="count", position=position_dodge())
+
+
+```
+
